@@ -27,11 +27,12 @@ Syntax:
 Commands:
 
     help        Displays this help message.
-    install [PACKAGE [VERSION]]
-                When used without a PACKAGE and VERSION, this installs the
+    install [OPTIONS] [PACKAGE [...]]
+                When used without PACKAGE and OPTIONS, this installs the
                 dependencies listed in bpm.ini. Otherwise, installs the
-                specified package (and optionally a version).
-    run <SCRIPT> [ARGUMENTS]
+                specified package. Use the option -g or --global to install
+                the packages globally.
+    run <SCRIPT> [ARGUMENT [...]]
                 Runs a specified script. When arguments are included, they
                 are passed to the script.
     version     Display BPM version and build information.

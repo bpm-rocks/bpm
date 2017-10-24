@@ -10,7 +10,7 @@
 # wrapper scripts go for installed programs, `$libDir` is where the library
 # will get installed.
 #
-# * For global installs (not yet supported)
+# * For global installs (use -g or --global)
 #     * `$libDir` is `/usr/lib/bpm`
 #     * `$binDir` is `/usr/bin`
 # * When there is a `bpm.ini` file in the current directory or any parent
