@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Adds a package to the list of packages to install.
+#
+# $1 - Package name.
+#
+# Alters BPM_INSTALL_LIST array to include the package name, without
+# duplication.
+#
+# Returns true (0) on success.
+bpm::addToInstallList() {
+    # shellcheck disable=SC2068
+    if ! array::contains "$1" ${BPM_INSTALL_LIST[@]+"${BPM_INSTALL_LIST[@]}"}; then
+        BPM_INSTALL_LIST[${#BPM_INSTALL_LIST[@]}]=$1
+    fi
+}

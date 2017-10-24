@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+. ../../lib/is-sourced
+
+if bpm::isSourced; then
+    echo "SOURCED"
+else
+    echo "EXECUTED"
+fi

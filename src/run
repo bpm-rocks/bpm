@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Runs a script as defined in a `bpm.ini` file after setting up the PATH
+# to include, in this order:
+#
+# 1. The `bpm/.bin` folder in the current directory or the first parent that
+#    contains a `bpm.ini` file.
+# 2. The user's `~/.bpm/.bin` folder.
+# 3. The system's `/usr/lib/bpm/.bin` folder.
+# 4. The rest of the existing PATH.
+#
+# The command is looked up in `bpm.ini` and is executed. Any additional
+# arguments specified on the command line are appended to the defined command.
+#
+# Returns the result from running the command. Can return an error status
+# (not zero) when errors are detected.
+bpm::run() {
+    local cmd iniFile iniPrefix list
+
+    if ! bpm::findParentIni iniFile; then
+        echo "Unable to find bpm.ini." >&2
+
+        return 1
+    fi
+
+    log::debug "Loading bpm.ini: $iniFile"
+    ini::prefix iniPrefix
+    ini::parse "$iniPrefix" "$(cat "$iniFile")"
+
+    if [[ -z "$1" ]]; then
+        ini::get list "$iniPrefix" scripts
+
+        if [[ "${#list[@]}" -eq 0 ]]; then
+            echo "There are no scripts defined in $iniFile."
+        else
+            echo "Commands in $iniFile:"
+            echo ""
+
+            for cmd in "${list[@]}"; do
+                echo -n "$cmd="
+                ini::get cmd "$iniPrefix" scripts "$cmd"
+                echo "$cmd"
+            done
+        fi
+
+        return 0
+    fi
+
+    ini::get cmd "$iniPrefix" scripts "$1"
+
+    if [[ -z "$cmd" ]]; then
+        echo "Command does not exist in $iniFile: $1" >&2
+        echo "See 'bpm run' for a list of commands." >&2
+
+        return 2
+    fi
+
+    # Remove the first argument to bpm::run so we're left with only the extra
+    # arguments.
+    shift
+    bpm::addLocationsToPath
+   
+    # Go to the directory containing `bpm.ini` so there's a consistent place
+    # where the command is executed.
+    cd "${iniFile%/*}"
+
+    # Display the command to be executed.
+    echo "$cmd $*"
+
+    # Add the extra arguments to the command that's being executed.
+    # shellcheck disable=SC2068
+    eval "$cmd ; exit \$?"
+}

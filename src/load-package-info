@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Retrieves a package's definition from the repository stored in GitHub.
+#
+# $1 - INI prefix.
+# $1 - Package name.
+#
+# Returns an error if the page could not be retrieved.
+bpm::loadPackageInfo() {
+    local iniData
+
+    log::debug "Loading package information"
+    iniData=$(bpm::getUrl "https://rawgit.com/bpm-rocks/registry/master/packages/$2.ini")
+
+    if [[ -z "$iniData" ]]; then
+        log::error "Unable to download package information. Not found."
+
+        return 1
+    fi
+
+    ini::parse "$1" "$iniData"
+}

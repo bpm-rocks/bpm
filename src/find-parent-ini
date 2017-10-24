@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Finds a `bpm.ini` file in the current directory or any parent. When found,
+# this will send the INI file location to the destination variable name.  The
+# INI file location will be root-relative (you'll see `/folder/dir/bpm.ini`
+# instead of `../bpm.ini`.
+#
+# Returns true (0) if `bpm.ini` was found.
+bpm::findParentIni() {
+    local dir
+
+    dir=$PWD
+
+    # Scan parent folders for `bpm.ini`.
+    while true; do
+        if [[ -f "$dir/bpm.ini" ]]; then
+            log::debug "Found bpm.ini: $dir/bpm.ini"
+            local "${1-}" && assign::value "$1" "$dir/bpm.ini"
+
+            return 0
+        fi
+
+        if [[ -z "$dir" ]]; then
+            log::debug "Did not find bpm.ini"
+
+            return 1
+        fi
+
+        log::debug "Did not find bpm.ini in folder: $dir"
+        dir=${dir%/*}
+    done
+}

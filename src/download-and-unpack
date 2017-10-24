@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Download a package archive and extract the contents.
+#
+# $1 - Lib directory.
+# $2 - Package name.
+# $3 - Package's URL.
+#
+# Returns 0 if all went successfully.
+bpm::downloadAndUnpack() {
+    log::debug "Downloading $2: $3"
+    mkdir -p "$1/$2" || return 1
+
+    (
+        cd "$1/$2"
+        bpm::getUrl "$3" | tar xz
+    )
+
+    # Check if all files are nested in a single folder
+    files=("$1/$2/"*)
+
+    if [[ "${#files[@]}" -eq 1 && -d "${files[0]}" ]]; then
+        log::debug "Moving package from nested folder."
+        mv "$1/$2" "$1/$2.temp.$$"
+        mv "$1/$2.temp.$$/"* "$1/$2"
+        rmdir "$1/$2.temp.$$"
+    fi
+}

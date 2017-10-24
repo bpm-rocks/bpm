@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Creates a loader wrapper in order to load a package.
+#
+# $1 - Library folder.
+# $2 - Bin folder.
+# $3 - Package name.
+# $4 - INI prefix.
+#
+# Returns nothing.
+bpm::linkPrograms() {
+    local dest key libFolderResolved oldPwd programs src
+
+    ini::get programs "$4" install
+
+    if [[ "${#programs[@]}" -eq 0 ]]; then
+        log::debug "No 'install' setting in INI file."
+
+        return 0
+    fi
+
+    # This is necessary to support for globally installed packages.
+    oldPwd=$PWD
+    cd "$1/$3"
+    libFolderResolved=$PWD
+    cd "$oldPwd"
+
+    for key in "${programs[@]}"; do
+        ini::get dest "$4" install "$key"
+
+        if [[ -z "$dest" ]]; then
+            log::error "Destination is empty for program with key: $key"
+
+            return 1
+        fi
+
+        if [[ ! -f "$1/$3/$dest" ]]; then
+            log::error "Package wants to expose $dest but file does not exist."
+
+            return 1
+        fi
+
+        if [[ ! -d "$2" ]]; then
+            mkdir -p "$2"
+        fi
+
+        src=${dest##*/}
+        log::debug "Writing program wrapper $src-> $3/$dest"
+        cat > "$2/$src" <<EOF
+#!/usr/bin/env bash
+# Generated command file for bpm
+"$libFolderResolved/$dest" \${@+"\$@"}
+EOF
+        chmod 755 "$2/$src"
+    done
+}

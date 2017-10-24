@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Loads an INI file and gets the packages from it that are necessary for
+# installation.
+#
+# $1 - INI file location.
+# $2 - Section name (`dependencies` or `devDependencies`).
+#
+# This returns true (0) on success.
+bpm::packagesFromIni() {
+    local iniPrefix key name packages
+
+    log::debug "Loading bpm.ini: $1"
+    ini::prefix iniPrefix
+    ini::parse "$iniPrefix" "$(cat "$1")"
+    log::debug "Loading section: $2"
+    ini::get packages "$iniPrefix" "$2"
+
+    if [[ "${#packages[@]}" -gt 0 ]]; then
+        for key in "${packages[@]}"; do
+            ini::get name "$iniPrefix" "$2" "$key"
+            bpm::addToInstallList "$name" || return 1
+        done
+    fi
+}

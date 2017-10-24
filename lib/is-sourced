@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Determine if the script is being sourced.
+#
+# Examples
+#
+#   mycommand() {
+#       # This function can be sourced or executed as a command.
+#   }
+#
+#   if bpm::isSourced; then
+#       mycommand "$@"
+#   fi
+#
+# Returns true (0) when sourced, false otherwise.
+bpm::isSourced() {
+    [[ "${FUNCNAME[1]-}" == "source" ]]
+}

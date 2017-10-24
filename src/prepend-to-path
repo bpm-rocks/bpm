@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Checks if a directory exists. If it does, prepend the folder to the PATH.
+#
+# $1 - Folder path.
+# $2 - Description.
+#
+# Returns nothing.
+bpm::prependToPath() {
+    local oldPwd
+
+    if [[ ! -d "$1" ]]; then
+        log::debug "No $2 folder found"
+
+        return
+    fi
+
+    # Find the resolved location
+    oldPwd=$PWD
+    cd "$1"
+    log::debug "Prepending $2 to path: $PWD"
+    PATH="$PWD:$PATH"
+    cd "$oldPwd"
+}

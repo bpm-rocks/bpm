@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Create a unit test setup function that loads all libraries.
+#
+# $1 - Path to the root of the project.
+#
+# Returns nothing.
+unittest::setup() {
+    for F in "$1/lib/"*; do
+        . "$F"
+    done
+
+    for F in "$1/src/"*; do
+        . "$F"
+    done
+
+    bpm::include assign
+    bpm::include ini
+    bpm::include is
+    bpm::include log
+}

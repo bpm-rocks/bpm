@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+. bpm
+bpm::include bench
+
+declare result
+bench::test result bpm::include is
+echo "is: ${result[0]} sec, ${result[1]} ops/sec"
+bench::test result bpm::include is
+echo "is: ${result[0]} sec, ${result[1]} ops/sec"
+bench::test result bpm::include is
+echo "is: ${result[0]} sec, ${result[1]} ops/sec"
+bench::test result bpm::include is
+echo "is: ${result[0]} sec, ${result[1]} ops/sec"

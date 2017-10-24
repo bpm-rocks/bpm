@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Show BPM's build date and version.
+#
+# Returns nothing.
+bpm::version() {
+    local buildDate var
+
+    buildDate=${BPM_BUILD_DATE/T/ }
+    printf "# BPM - Bash Package Manager, version %s, built %s UTC\n" "$BPM_VERSION" "${buildDate%+*}"
+
+    for var in BASH_VERSION BPM_BUILD_DATE BPM_VERSION; do
+        printf "%s=%q\n" "$var" "${!var}"
+    done
+}

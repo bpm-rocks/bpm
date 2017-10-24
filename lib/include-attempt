@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Tries to include a library at a given path. Used strictly by bpm::include
+# to attempt to load a module.
+#
+# $1 - Variable to assign if the library is loaded.
+# $2 - Full path of library to load.
+#
+# Returns true (0) if the library loaded successfully. Returns 1 if the
+# library does not exist. Returns 2 if there was an error during the load
+# of a library.
+bpm::includeAttempt() {
+    [[ -f "$2" ]] || return 1
+    . "$2" || return 2
+
+    # shellcheck disable=SC2059
+    printf -v "$1" "$2"
+}

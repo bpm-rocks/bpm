@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+. bpm
+bpm::include unittest
+unittest::run
+
+unittest::setup() {
+    . ../../lib/include
+
+    bpm::include strict
+
+    # Go to our fake setup
+    cd include
+
+    # Pretend the user's home directory is here
+    export HOME="$PWD/user"
+    
+    # Pretend the system's collection of libraries is here
+    export BPM_GLOBAL_PATH="$PWD/global"
+
+    # Change our working directory
+    cd working
+}
+
+unittest::case::module-gets-marked-as-loaded() {
+    declare bpm_include_testmodule
+
+    [[ -z "${bpm_include_testmodule+z}" ]] || return 1
+    bpm::include testmodule
+    [[ -n "${bpm_include_testmodule-}" ]]
+}
+
+unittest::case::module-only-loaded-once() {
+    export bpm_include_notfound=true
+
+    # Should not error because it was already "loaded"
+    bpm::include notfound &> /dev/null
+}
+
+unittest::case::module-not-found() {
+    ! bpm::include notfound &> /dev/null
+}
+
+unittest::case::requires-a-name() {
+    local result
+
+    strict::run result bpm::include &> /dev/null
+    [[ "$result" == 2 ]]
+}
+
+unittest::case::find-in-working-dir() {
+    bpm::include working-lib
+}
+
+unittest::case::find-in-parent-of-working-dir() {
+    bpm::include parent-lib
+}
+
+unittest::case::find-in-user-dir() {
+    bpm::include user-lib
+}

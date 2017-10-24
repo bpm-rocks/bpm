@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+addFile() {
+    tail -n +2 "$1"
+    echo ""
+    echo ""
+}
+
+cd "${0%/*}/.."
+
+cat <<EOF
+#!/usr/bin/env bash
+# Bash Package Manager (BPM)
+BPM_VERSION="$(grep ^version= bpm.ini | cut -d= -f2)"
+BPM_BUILD_DATE="$(date -u -Iseconds)"
+BPM_GLOBAL_PATH=/usr/lib/bpm-modules
+
+EOF
+
+for F in lib/*; do
+    addFile "$F"
+done
+
+cat <<'EOF'
+# Do not execute anything further when we are sourced.
+bpm::isSourced && return
+
+EOF
+
+# Include libraries. Specify them here in the right order so the dependencies
+# are loaded before the library is loaded. Doing it in the right order makes
+# the later calls to bpm::include() skip doing anything because it loaded that
+# library already.
+#
+# Library list. Also cites dependencies and if the library is used directly
+# by BPM or if it is an indirect dependency only.
+#
+# | Library | Direct? | Dependencies              |
+# |---------|---------|---------------------------|
+# | is      | Yes     |                           |
+# | assign  | Yes     | is                        |
+# | string  | No      | assign                    |
+# | array   | No      | assign                    |
+# | log     | Yes     | array, string             |
+# | ini     | Yes     | array, assign, is, string |
+
+for lib in is assign string array log ini; do
+    echo "bpm_include_$lib=\$0"
+    cat bpm-modules/$lib/lib$lib
+done
+
+for F in src/*; do
+    addFile "$F"
+done
+
+cat <<'EOF'
+
+# Run the main program
+# shellcheck disable=SC2068
+bpm ${@+"${@}"}
+
+# Thanks!
+EOF

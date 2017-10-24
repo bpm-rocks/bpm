@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+. bpm
+bpm::include unittest
+unittest::run
+
+unittest::setup() {
+    . ../../lib/include-attempt
+    bpm::include strict
+}
+
+unittest::case::file-does-not-exist() {
+    local result
+
+    strict::run result bpm::includeAttempt testing /does.not.exist
+    [[ "$result" == 1 ]]
+}
+
+unittest::case::file-fails-during-source() {
+    local result
+
+    strict::run result bpm::includeAttempt testing include-attempt/fail
+    [[ "$result" == 2 ]]
+}
+
+unittest::case::success() {
+    local testing
+
+    testing="unchanged"
+    bpm::includeAttempt testing include-attempt/pass || return 1
+    [[ "$testing" == include-attempt/pass ]]
+}

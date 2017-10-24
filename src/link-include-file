@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Creates a loader wrapper in order to load a package.
+#
+# $1 - Library folder.
+# $2 - Package name.
+# $3 - INI prefix.
+#
+# Returns nothing.
+bpm::linkIncludeFile() {
+    local include
+
+    ini::get include "$3" package include
+
+    if [[ -z "$include" ]]; then
+        log::debug "No 'package.include' setting in INI file."
+
+        return 0
+    fi
+
+    if [[ ! -f "$1/$2/$include" ]]; then
+        log::error "Library wants to include $include but file does not exist."
+
+        return 1
+    fi
+
+    if [[ ! -d "$1/.include" ]]; then
+        mkdir "$1/.include"
+    fi
+
+    log::debug "Writing wrapper .include/$2 -> $2/$include"
+    cat > "$1/.include/$2" <<EOF
+#!/usr/bin/env bash
+# Generated include file for bpm
+pushd "\${BASH_SOURCE[0]%/*}/../$2" &>/dev/null
+. "./$include"
+popd &> /dev/null
+EOF
+}

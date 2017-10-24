@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Installs a package or set of packages.
+#
+# $1 - Package specificiation. Optional. When not assigned a value, will
+#      search for a `bpm.ini` file and install everything listed under the
+#      `[dependencies]` and `[devDependencies]` sections.
+#
+# Determines the install location. This is passed on to other commands so they
+# install further dependencies into the same location. `$binDir` is where
+# wrapper scripts go for installed programs, `$libDir` is where the library
+# will get installed.
+#
+# * For global installs (not yet supported)
+#     * `$libDir` is `/usr/lib/bpm`
+#     * `$binDir` is `/usr/bin`
+# * When there is a `bpm.ini` file in the current directory or any parent
+#     * `$libDir` is `$bpmIniDir/bpm`
+#     * `$binDir` is `$bpmIniDir/bpm/.bin`
+# * Installs into a local user's directory
+#     * `$libDir` is `~/.bpm`
+#     * `$binDir` is `~/.bpm/.bin`
+#
+# See `bpm::installPackage()` for more details.
+#
+# This returns true (0) on success.
+bpm::install() {
+    local binDir iniFile libDir package
+
+    BPM_INSTALL_LIST=()
+
+    if [[ "$#" -eq 0 ]]; then
+        if ! bpm::findParentIni iniFile; then
+            log::error "No bpm.ini file found and not provided a name of a package to install."
+
+            return 1
+        fi
+
+        log::debug "Install is using INI: $iniFile"
+        bpm::packagesFromIni "$iniFile" dependencies
+        bpm::packagesFromIni "$iniFile" devDependencies
+        libDir="${iniFile%/*}/bpm-modules"
+        binDir="$libDir/.bin"
+    else
+        if bpm::findParentIni iniFile; then
+            libDir="${iniFile%/*}/.bpm"
+            binDir="$libDir/.bin"
+        else
+            libDir=~/.bpm
+            binDir=~/.bpm/.bin
+        fi
+
+        while [[ "$#" -gt 0 ]]; do
+            case "$1" in
+                -g|--global)
+                    log::debug "Installing to a global location"
+                    libDir=/usr/lib/bpm
+                    binDir=/usr/bin
+                    ;;
+
+                -*)
+                    log::warn "Unknown option: $1"
+
+                    return 1
+                    ;;
+
+                *)
+                    log::debug "Install is using a package name: $1"
+                    bpm::addToInstallList "$1"
+                    ;;
+            esac
+
+            shift
+        done
+    fi
+
+    # Now install everything
+    if [[ "${#BPM_INSTALL_LIST[@]}" -gt 0 ]]; then
+        for package in "${BPM_INSTALL_LIST[@]}"; do
+            bpm::installPackage "$libDir" "$binDir" "$package"
+        done
+    else
+        log::debug "No packages to install."
+    fi
+}

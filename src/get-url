@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Downloads a file from the internet, pipes to stdout.
+#
+# $1 - URL.
+#
+# Returns an error if no usable tool was found.
+bpm::getUrl() {
+    if hash curl &> /dev/null; then
+        curl --fail --silent --location "$1"
+    elif hash wget &> /dev/null; then
+        wget -O - "$1" 2> /dev/null
+    else
+        log::error "Unable to download - no supported tools exist."
+        log::error "Please install curl or wget."
+
+        return 1
+    fi
+}

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# The body of the BPM command line program
+#
+# $@ - Arguments passed on the command line.
+#
+# Returns true (0) on success. Returns 1 when no command was passed. Returns
+# 2 when an unknown command was issued.
+bpm() {
+    local command
+
+    if [[ -z "${1-}" ]]; then
+        echo "Specify a command to run. Use 'bpm help' to see a list of commands." >&2
+
+        return 1
+    fi
+
+    command=$1
+    shift
+
+    case "$command" in
+        help)
+            # shellcheck disable=SC2068
+            bpm::help ${@+"$@"}
+            ;;
+
+        install)
+            # shellcheck disable=SC2068
+            bpm::install ${@+"$@"}
+            ;;
+
+        run)
+            # shellcheck disable=SC2068
+            bpm::run ${@+"$@"}
+            ;;
+
+        version)
+            bpm::version
+            ;;
+
+        *)
+            echo "Unknown command: $command" >&2
+            echo "Use 'bpm help' to get a list of commands." >&2
+
+            return 2
+            ;;
+    esac
+}

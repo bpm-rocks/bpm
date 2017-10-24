@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+. bpm
+bpm::include unittest
+unittest::run
+
+unittest::setup() {
+    . ../../lib/is-sourced
+}
+
+unittest::case::when-executed() {
+    local status
+
+    status=$(./is-sourced)
+    [[ "$status" == "EXECUTED" ]]
+}
+
+unittest::case::when-sourced-period() {
+    local status
+
+    status=$(. is-sourced)
+    [[ "$status" == "SOURCED" ]]
+}
+
+unittest::case::when-sourced-keyword() {
+    local status
+
+    status=$(source is-sourced)
+    [[ "$status" == "SOURCED" ]]
+}

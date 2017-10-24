@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Display help messages for using BPM.
+#
+# $@ - Arguments passed on the command line.
+#
+# Returns true (0) on success. Returns 1 when a subtopic is requested but
+# is not found.
+bpm::help() {
+    if [[ -n "${1-}" ]]; then
+        if ! is::function "bpm::help::$1"; then
+            echo "No such help topic. Use 'bpm help' to list the topics."
+
+            return 1
+        fi
+
+        log::debug "Displaying help topic: $1"
+        "bpm::help::$1"
+    else
+        log::debug "Displaying help"
+        cat <<'EOF'
+BPM - Bash Package Manager
+
+Syntax:
+
+    bpm <COMMAND> [ARGUMENTS]
+
+Commands:
+
+    help        Displays this help message.
+    install [PACKAGE [VERSION]]
+                When used without a PACKAGE and VERSION, this installs the
+                dependencies listed in bpm.ini. Otherwise, installs the
+                specified package (and optionally a version).
+    run <SCRIPT> [ARGUMENTS]
+                Runs a specified script. When arguments are included, they
+                are passed to the script.
+    version     Display BPM version and build information.
+EOF
+    fi
+}
