@@ -6,26 +6,9 @@
 #
 # Returns true (0) if `bpm.ini` was found.
 bpm::findParentIni() {
-    local dir
+    local result
 
-    dir=$PWD
+    path::findParentContaining result -f "bpm.ini" || return 0
 
-    # Scan parent folders for `bpm.ini`.
-    while true; do
-        if [[ -f "$dir/bpm.ini" ]]; then
-            log::debug "Found bpm.ini: $dir/bpm.ini"
-            local "${1-}" && assign::value "$1" "$dir/bpm.ini"
-
-            return 0
-        fi
-
-        if [[ -z "$dir" ]]; then
-            log::debug "Did not find bpm.ini"
-
-            return 1
-        fi
-
-        log::debug "Did not find bpm.ini in folder: $dir"
-        dir=${dir%/*}
-    done
+    local "${1-}" && assign::value "$1" "$result"
 }

@@ -14,7 +14,7 @@
 # Returns the result from running the command. Can return an error status
 # (not zero) when errors are detected.
 bpm::run() {
-    local cmd iniFile iniPrefix list
+    local cmd iniFile iniPrefix list scriptToRun
 
     if ! bpm::findParentIni iniFile; then
         echo "Unable to find bpm.ini." >&2
@@ -36,9 +36,8 @@ bpm::run() {
             echo ""
 
             for cmd in "${list[@]}"; do
-                echo -n "$cmd="
-                ini::get cmd "$iniPrefix" scripts "$cmd"
-                echo "$cmd"
+                ini::get scriptToRun "$iniPrefix" scripts "$cmd"
+                echo "$cmd=$scriptToRun"
             done
         fi
 
@@ -58,7 +57,7 @@ bpm::run() {
     # arguments.
     shift
     bpm::addLocationsToPath
-   
+
     # Go to the directory containing `bpm.ini` so there's a consistent place
     # where the command is executed.
     cd "${iniFile%/*}"

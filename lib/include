@@ -22,7 +22,7 @@ bpm::include() {
 
     cachedVarName="bpm_include_$1"
     cachedVarName=${cachedVarName//-/_}
-    
+
     if [[ -n "${!cachedVarName-}" ]]; then
         # Already loaded
         return 0
@@ -30,8 +30,10 @@ bpm::include() {
 
     # This next block is equivalent to shelling out to call `dirname`, but
     # is roughly twice as fast. It changes things like "file" into ".", but
-    # anything with paths ("./file", "../file", "/dir/file") have the last 
+    # anything with paths ("./file", "../file", "/dir/file") have the last
     # slash removed as well as everything afterwards.
+    #
+    # Do not use path::dirname because that library hasn't been loaded yet.
     dir=${BASH_SOURCE[1]}
 
     if [[ "$dir" == */* ]]; then

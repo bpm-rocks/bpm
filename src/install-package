@@ -4,6 +4,7 @@
 # $1 - Library directory for installation.
 # $2 - Bin directory for installation.
 # $3 - Package name.
+# $4 - Package version specifier.
 #
 # Packages are checked for executable programs and file includes when being
 # installed. The executables are placed in `$BIN_DIR` and the includes go
@@ -31,9 +32,10 @@
 #   executable wrapper scripts. The wrappers will be created as
 #   `$BIN_DIR/$COMMAND_NAME`.
 #
-# This returns true (0) on success.
+# This returns true (0) on success. Returns 1 if there is any issue downloading
+# the package.
 bpm::installPackage() {
-    local definitionPrefix dependencies dependency key packagePrefix url
+    local dependencies package packagePrefix version
 
     # See if it is already installed.
     if [[ -d "$1/$3" ]]; then
@@ -43,21 +45,7 @@ bpm::installPackage() {
     fi
 
     echo "Installing $3"
-
-    # Download INI from website
-    ini::prefix definitionPrefix
-    bpm::loadPackageInfo "$definitionPrefix" "$3" || return 1
-
-    # Download
-    ini::get url "$definitionPrefix" "$3" "downloadUrl"
-
-    if [[ -z "$url" ]]; then
-        log::error "No 'downloadUrl' property in package's information."
-
-        return 1
-    fi
-
-    bpm::downloadAndUnpack "$1" "$3" "$url"
+    bpm::downloadPackage "$1" "$3" "$4" || return 1
 
     # Parse the INI
     ini::prefix packagePrefix
@@ -77,9 +65,9 @@ bpm::installPackage() {
     ini::get dependencies "$packagePrefix" dependencies
 
     if [[ "${#dependencies[@]}" ]]; then
-        for key in "${dependencies[@]}"; do
-            ini::get dependency "$packagePrefix" dependencies "$key"
-            bpm::installPackage "$1" "$2" "$dependency"
+        for package in "${dependencies[@]}"; do
+            ini::get version "$packagePrefix" dependencies "$package"
+            bpm::installPackage "$1" "$2" "$package" "$version"
         done
     fi
 }

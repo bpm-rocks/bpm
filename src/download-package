@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+# Use the version specifier and download or copy the files into the modules
+# folder.
+#
+# $1 - Library directory for installation.
+# $2 - Package name.
+# $3 - Package version specifier.
+#
+# Returns true (0) on success. Returns 1 if the download method could not be
+# determined. Returns error return code from other download functions if they
+# fail.
+bpm::downloadPackage() {
+    if [[ "$3" == "*" ]]; then
+        bpm::downloadPackageFromRegistry "$1" "$2" "$3"
+    elif [[ -d "$3" ]]; then
+        bpm::downloadPackageFromDirectory "$1" "$2" "$3"
+    elif [[ -f "$3" ]]; then
+        bpm::downloadPackageFromArchive "$1" "$2" "$3"
+    else
+        log::error "Unable to download package $2: $3"
+        log::error "No known method of download."
+
+        return 1
+    fi
+}

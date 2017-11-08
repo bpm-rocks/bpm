@@ -7,7 +7,7 @@
 #
 # This returns true (0) on success.
 bpm::packagesFromIni() {
-    local iniPrefix key name packages
+    local iniPrefix package packages version
 
     log::debug "Loading bpm.ini: $1"
     ini::prefix iniPrefix
@@ -16,9 +16,9 @@ bpm::packagesFromIni() {
     ini::get packages "$iniPrefix" "$2"
 
     if [[ "${#packages[@]}" -gt 0 ]]; then
-        for key in "${packages[@]}"; do
-            ini::get name "$iniPrefix" "$2" "$key"
-            bpm::addToInstallList "$name" || return 1
+        for package in "${packages[@]}"; do
+            ini::get version "$iniPrefix" "$2" "$package"
+            bpm::addToInstallList "$package" "$version" || return 1
         done
     fi
 }

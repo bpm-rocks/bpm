@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# If the specified folder has only one entry and it's a directory, move the
+# contents of that directory into the parent. This is useful when an archive is
+# extracted and it contains all files within a parent folder.
+#
+# $1 - Path name to check.
+#
+# Returns true (0) upon success. Returns 1 when the specified directory does
+# not exist or if it is not a directory.
+bpm::fixPackageNesting() {
+    local files restoreDotglob tempDir
+
+    if [[ ! -d "$1" ]]; then
+        log::error "Not a directory: $1"
+
+        return 1
+    fi
+
+    restoreDotglob=$(shopt -p dotglob)
+    shopt -s dotglob
+    files=("$1/"*)
+    eval "$restoreDotglob"
+
+    if [[ "${#files[@]}" -eq 1 && -d "${files[0]}" ]]; then
+        log::debug "Unnesting: ${files[0]}"
+        tempDir="$1.temp.$$"
+        mv "${files[0]}" "$tempDir"
+        rmdir "$1"
+        mv "$tempDir" "$1"
+    fi
+}

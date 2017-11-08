@@ -24,7 +24,7 @@
 #
 # This returns true (0) on success.
 bpm::install() {
-    local binDir iniFile libDir package
+    local binDir iniFile libDir package versionVar
 
     BPM_INSTALL_LIST=()
 
@@ -65,7 +65,7 @@ bpm::install() {
 
                 *)
                     log::debug "Install is using a package name: $1"
-                    bpm::addToInstallList "$1"
+                    bpm::addToInstallList "$1" "${2:-*}"
                     ;;
             esac
 
@@ -76,7 +76,9 @@ bpm::install() {
     # Now install everything
     if [[ "${#BPM_INSTALL_LIST[@]}" -gt 0 ]]; then
         for package in "${BPM_INSTALL_LIST[@]}"; do
-            bpm::installPackage "$libDir" "$binDir" "$package"
+            string::toHex versionVar "$package"
+            versionVar="BPM_INSTALL_LIST_$versionVar"
+            bpm::installPackage "$libDir" "$binDir" "$package" "${!versionVar}"
         done
     else
         log::debug "No packages to install."

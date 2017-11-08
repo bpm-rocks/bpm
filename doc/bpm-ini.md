@@ -13,18 +13,18 @@ Here's a short example that shows several features. Each INI file section is exp
     license=MIT
 
     [dependencies]
-    0=assign
+    assign=*
 
     [devDependencies]
-    0=embed-docs
-    1=unittest
+    embed-docs=*
+    unittest=*
 
     [scripts]
     readme=embed-docs README.md libsample
     test=unittest test/*.test
 
     [install]
-    0=sample
+    sample=sample
 
 Section names and keys are not case sensitive, thus `[devDependencies]` is the same as `[DEVDEPENDENCIES]` and `name=sample-package` is the same as `NAME=sample-package`. The values are case sensitive.
 

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# Downloads a package from a local directory.
+#
+# $1 - Library directory for installation.
+# $2 - Package name.
+# $3 - Package version specifier.
+#
+# Returns true (0) on success.
+bpm::downloadPackageFromDirectory() {
+    log::debug "Copying folder: $3"
+    cp -r "$3" "$1/$2"
+    bpm::fixPackageNesting
+}

@@ -2,14 +2,30 @@
 # Adds a package to the list of packages to install.
 #
 # $1 - Package name.
+# $2 - Package version specification.
 #
 # Alters BPM_INSTALL_LIST array to include the package name, without
 # duplication.
 #
-# Returns true (0) on success.
+# Returns true (0) on success. Returns 1 when there is a conflict of version
+# specifications.
 bpm::addToInstallList() {
+    local versionVar
+
+    string::toHex versionVar "$1"
+    versionVar="BPM_INSTALL_LIST_$versionVar"
+
     # shellcheck disable=SC2068
-    if ! array::contains "$1" ${BPM_INSTALL_LIST[@]+"${BPM_INSTALL_LIST[@]}"}; then
-        BPM_INSTALL_LIST[${#BPM_INSTALL_LIST[@]}]=$1
+    if array::contains "$1" ${BPM_INSTALL_LIST[@]+"${BPM_INSTALL_LIST[@]}"}; then
+        if [[ "${!versionVar}" != "$2" ]]; then
+            log::error "Package $1 already flagged to be installed, but with a different version."
+            log::error "Need: ${!versionVar}"
+            log::error "Also need: $2"
+
+            return 1
+        fi
     fi
+
+    BPM_INSTALL_LIST[${#BPM_INSTALL_LIST[@]}]=$1
+    assign::value "$versionVar" "$2"
 }

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# Downloads a package from the package registry.
+#
+# $1 - Library directory for installation.
+# $2 - Package name.
+# $3 - Package version specifier.
+#
+# Returns true (0) on success. Returns 1 when there is a problem downloading.
+# Returns 2 if there is no download URL in the package's descriptor.
+bpm::downloadPackageFromRegistry() {
+    local definitionPrefix iniData url
+
+    # Download INI from website
+    log::debug "Loading package information from registry: $2"
+    iniData=$(bpm::getUrl "https://rawgit.com/bpm-rocks/registry/master/packages/$2.ini" || :)
+
+    if [[ -z "$iniData" ]]; then
+        log::error "Unable to download package information from registry. Package not found."
+
+        return 1
+    fi
+
+    # Parse INI, get download URL to .tar.gz
+    ini::prefix definitionPrefix
+    ini::parse "$definitionPrefix" "$iniData"
+    ini::get url "$definitionPrefix" "$2" downloadUrl
+
+    if [[ -z "$url" ]]; then
+        log::error "No 'downloadUrl' property in package's information."
+
+        return 2
+    fi
+
+    (
+        mkdir -p "$1/$2" || return 1
+        cd "$1/$2"
+        log::debug "Download, untar, gunzip: $url"
+        bpm::getUrl "$url" | tar xz
+    )
+
+    bpm::fixPackageNesting "$1/$2"
+}

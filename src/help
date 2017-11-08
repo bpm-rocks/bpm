@@ -27,7 +27,7 @@ Syntax:
 Commands:
 
     help        Displays this help message.
-    install [OPTIONS] [PACKAGE [...]]
+    install [OPTIONS] [PACKAGE [VERSION]]
                 When used without PACKAGE and OPTIONS, this installs the
                 dependencies listed in bpm.ini. Otherwise, installs the
                 specified package. Use the option -g or --global to install

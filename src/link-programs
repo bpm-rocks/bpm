@@ -8,7 +8,7 @@
 #
 # Returns nothing.
 bpm::linkPrograms() {
-    local dest key libFolderResolved oldPwd programs src
+    local dest libFolderResolved oldPwd programs src
 
     ini::get programs "$4" install
 
@@ -24,17 +24,17 @@ bpm::linkPrograms() {
     libFolderResolved=$PWD
     cd "$oldPwd"
 
-    for key in "${programs[@]}"; do
-        ini::get dest "$4" install "$key"
+    for src in "${programs[@]}"; do
+        ini::get dest "$4" install "$src"
 
         if [[ -z "$dest" ]]; then
-            log::error "Destination is empty for program with key: $key"
+            log::error "Destination is empty for program: $src"
 
             return 1
         fi
 
         if [[ ! -f "$1/$3/$dest" ]]; then
-            log::error "Package wants to expose $dest but file does not exist."
+            log::error "File does not exist: $1/$3/$dest"
 
             return 1
         fi
@@ -44,7 +44,7 @@ bpm::linkPrograms() {
         fi
 
         src=${dest##*/}
-        log::debug "Writing program wrapper $src-> $3/$dest"
+        log::debug "Writing program wrapper $src -> $3/$dest"
         cat > "$2/$src" <<EOF
 #!/usr/bin/env bash
 # Generated command file for bpm
