@@ -47,7 +47,7 @@ bpm::installPackage() {
     echo "Installing $3"
 
     if ! bpm::downloadPackage "$1" "$3" "$4"; then
-        log::debug "Error downloading package. Removing any temporary directory."
+        log::error "Error downloading package."
         rm -rf "${1:?}/$2"
 
         return 1
