@@ -7,20 +7,24 @@
 # $2 - Package name.
 # $3 - Package version specifier.
 #
-# Returns true (0) on success. Returns 1 if the download method could not be
-# determined. Returns error return code from other download functions if they
-# fail.
+# Returns true (0) on success. Returns 1 if there was any problem that's
+# a file system level (can't make a directory, can't copy a file). Returns
+# 2 if the package could not be downloaded or if the download method is
+# unable to be determined. Returns 3 if the archive could not be expanded or
+# if there is invalid library information encountered.
 bpm::downloadPackage() {
     if [[ "$3" == "*" ]]; then
         bpm::downloadPackageFromRegistry "$1" "$2" "$3"
     elif [[ -d "$3" ]]; then
         bpm::downloadPackageFromDirectory "$1" "$2" "$3"
     elif [[ -f "$3" ]]; then
-        bpm::downloadPackageFromArchive "$1" "$2" "$3"
+        bpm::downloadPackageFromFile "$1" "$2" "$3"
+    elif [[ "$3" == *://* ]]; then
+        bpm::downloadPackageFromHttp "$1" "$2" "$3"
     else
         log::error "Unable to download package $2: $3"
         log::error "No known method of download."
 
-        return 1
+        return 2
     fi
 }

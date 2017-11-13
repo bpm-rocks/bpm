@@ -6,9 +6,12 @@
 # $2 - Package name.
 # $3 - Package version specifier.
 #
-# Returns true (0) on success.
+# Returns true (0) on success. Returns 1 if the folder can not be copied.
 bpm::downloadPackageFromDirectory() {
+    local dest
+
+    dest="$1/$2"
     log::debug "Copying folder: $3"
-    cp -r "$3" "$1/$2"
-    bpm::fixPackageNesting
+    cp -r "$3" "$dest" || return 1
+    bpm::fixPackageNesting "$dest"
 }

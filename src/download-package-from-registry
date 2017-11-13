@@ -6,10 +6,12 @@
 # $2 - Package name.
 # $3 - Package version specifier.
 #
-# Returns true (0) on success. Returns 1 when there is a problem downloading.
-# Returns 2 if there is no download URL in the package's descriptor.
+# Returns true (0) on success. Returns 1 if there is a strange filesystem
+# error (can't copy, can't make directory). Returns 2 when the files can't be
+# downloaded. Returns 3 if there is no download URL in the package's
+# descriptor.
 bpm::downloadPackageFromRegistry() {
-    local definitionPrefix iniData url
+    local definitionPrefix dest iniData url
 
     # Download INI from website
     log::debug "Loading package information from registry: $2"
@@ -18,7 +20,7 @@ bpm::downloadPackageFromRegistry() {
     if [[ -z "$iniData" ]]; then
         log::error "Unable to download package information from registry. Package not found."
 
-        return 1
+        return 3
     fi
 
     # Parse INI, get download URL to .tar.gz
@@ -29,15 +31,14 @@ bpm::downloadPackageFromRegistry() {
     if [[ -z "$url" ]]; then
         log::error "No 'downloadUrl' property in package's information."
 
-        return 2
+        return 3
     fi
 
-    (
-        mkdir -p "$1/$2" || return 1
-        cd "$1/$2"
-        log::debug "Download, untar, gunzip: $url"
-        bpm::getUrl "$url" | tar xz
-    )
-
-    bpm::fixPackageNesting "$1/$2"
+    dest="$1/$2"
+    mkdir -p "$dest" || return 1
+    log::debug "Downloading: $url"
+    bpm::getUrl "$url" > "$dest/.bpm-archive"
+    bpm::expandArchive "$dest" ".bpm-archive"
+    rm "$dest/.bpm-archive" || return 1
+    bpm::fixPackageNesting "$dest"
 }

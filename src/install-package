@@ -45,7 +45,13 @@ bpm::installPackage() {
     fi
 
     echo "Installing $3"
-    bpm::downloadPackage "$1" "$3" "$4" || return 1
+
+    if ! bpm::downloadPackage "$1" "$3" "$4"; then
+        log::debug "Error downloading package. Removing any temporary directory."
+        rm -rf "${1:?}/$2"
+
+        return 1
+    fi
 
     # Parse the INI
     ini::prefix packagePrefix

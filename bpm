@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bash Package Manager (BPM)
 BPM_VERSION="1.0.0"
-BPM_BUILD_DATE="2017-11-08T17:03:13+00:00"
+BPM_BUILD_DATE="2017-11-13T14:01:15+00:00"
 BPM_GLOBAL_PATH=/usr/lib/bpm-modules
 
 # Includes a library that was installed via `bpm install`.
@@ -4066,90 +4066,26 @@ bpm() {
 # $2 - Package name.
 # $3 - Package version specifier.
 #
-# Returns true (0) on success. Returns 1 if the download method could not be
-# determined. Returns error return code from other download functions if they
-# fail.
+# Returns true (0) on success. Returns 1 if there was any problem that's
+# a file system level (can't make a directory, can't copy a file). Returns
+# 2 if the package could not be downloaded or if the download method is
+# unable to be determined. Returns 3 if the archive could not be expanded or
+# if there is invalid library information encountered.
 bpm::downloadPackage() {
     if [[ "$3" == "*" ]]; then
         bpm::downloadPackageFromRegistry "$1" "$2" "$3"
     elif [[ -d "$3" ]]; then
         bpm::downloadPackageFromDirectory "$1" "$2" "$3"
     elif [[ -f "$3" ]]; then
-        bpm::downloadPackageFromArchive "$1" "$2" "$3"
+        bpm::downloadPackageFromFile "$1" "$2" "$3"
+    elif [[ "$3" == *://* ]]; then
+        bpm::downloadPackageFromHttp "$1" "$2" "$3"
     else
         log::error "Unable to download package $2: $3"
         log::error "No known method of download."
 
-        return 1
+        return 2
     fi
-}
-
-
-
-# Downloads a package from a given archive file.
-#
-# $1 - Library directory for installation.
-# $2 - Package name.
-# $3 - Package version specifier.
-#
-# Returns true (0) on success. Returns 1 when the archive format can not be
-# determined.
-bpm::downloadPackageFromArchive() {
-    local dest tempFile
-
-    dest="$1/$2"
-    cp "$3" "$dest/.bpm-archive"
-    mkdir -p "$dest"
-
-    case "$2" in
-        *.tar)
-            log::debug "Untar: $3"
-            tempFile="bpm-archive-$$.tar"
-            (
-                cp "$3" "$dest/$tempFile"
-                cd "$dest"
-                tar xf "$tempFile"
-            )
-            ;;
-
-        *.tar.bz2)
-            log::debug "Untar and bunzip2: $3"
-            tempFile="bpm-archive-$$.tar.bz2"
-            (
-                cp "$3" "$dest/$tempFile"
-                cd "$dest"
-                tar xfj "$tempFile"
-            )
-            ;;
-
-        *.tar.gz|*.tgz)
-            log::debug "Untar and gunzip: $3"
-            tempFile="bpm-archive-$$.tar.gz"
-            (
-                cp "$3" "$dest/$tempFile"
-                cd "$dest"
-                tar xfz "$tempFile"
-            )
-            ;;
-
-        *.zip)
-            log::debug "Unzip: $3"
-            tempFile="bpm-archive-$$.zip"
-            (
-                cp "$3" "$dest/$tempFile"
-                cd "$dest"
-                unzip -qq "$tempFile"
-            )
-            ;;
-
-        *)
-            log::error "Unknown archive file format: $3"
-
-            return 1
-    esac
-
-    rm "$dest/$tempFile"
-    bpm::fixPackageNesting "$dest"
 }
 
 
@@ -4160,11 +4096,37 @@ bpm::downloadPackageFromArchive() {
 # $2 - Package name.
 # $3 - Package version specifier.
 #
-# Returns true (0) on success.
+# Returns true (0) on success. Returns 1 if the folder can not be copied.
 bpm::downloadPackageFromDirectory() {
+    local dest
+
+    dest="$1/$2"
     log::debug "Copying folder: $3"
-    cp -r "$3" "$1/$2"
-    bpm::fixPackageNesting
+    cp -r "$3" "$dest" || return 1
+    bpm::fixPackageNesting "$dest"
+}
+
+
+
+# Downloads a package from a given archive file.
+#
+# $1 - Library directory for installation.
+# $2 - Package name.
+# $3 - Package version specifier.
+#
+# Returns true (0) on success. Returns 1 for filesystem level errors (can't
+# make a directory, can't copy a file). Returns 3 when the archive can not be
+# expanded.
+bpm::downloadPackageFromFile() {
+    local dest
+
+    dest="$1/$2"
+    log::debug "Copying file: $3"
+    mkdir -p "$dest" || return 1
+    cp "$3" "$dest/.bpm-archive" || return 1
+    bpm::expandArchive "$dest" ".bpm-archive" || return 3
+    rm "$dest/.bpm-archive" || return 1
+    bpm::fixPackageNesting "$dest"
 }
 
 
@@ -4175,10 +4137,35 @@ bpm::downloadPackageFromDirectory() {
 # $2 - Package name.
 # $3 - Package version specifier.
 #
-# Returns true (0) on success. Returns 1 when there is a problem downloading.
-# Returns 2 if there is no download URL in the package's descriptor.
+# Returns true (0) on success. Returns 1 when there is a strange error, such
+# as not being able to make a folder. Returns 2 if there's a download problem.
+# Returns 3 if the archive can not be expanded.
+bpm::downloadPackageFromHttp() {
+    local dest
+
+    dest="$1/$2"
+    mkdir -p "$dest" || return 1
+    log::debug "Downloading: $3"
+    bpm::getUrl "$3" > "$dest/.bpm-archive" || return 2
+    bpm::expandArchive "$dest" ".bpm-archive" || return 3
+    rm "$dest/.bpm-archive" || return 1
+    bpm::fixPackageNesting "$1/$2"
+}
+
+
+
+# Downloads a package from the package registry.
+#
+# $1 - Library directory for installation.
+# $2 - Package name.
+# $3 - Package version specifier.
+#
+# Returns true (0) on success. Returns 1 if there is a strange filesystem
+# error (can't copy, can't make directory). Returns 2 when the files can't be
+# downloaded. Returns 3 if there is no download URL in the package's
+# descriptor.
 bpm::downloadPackageFromRegistry() {
-    local definitionPrefix iniData url
+    local definitionPrefix dest iniData url
 
     # Download INI from website
     log::debug "Loading package information from registry: $2"
@@ -4187,7 +4174,7 @@ bpm::downloadPackageFromRegistry() {
     if [[ -z "$iniData" ]]; then
         log::error "Unable to download package information from registry. Package not found."
 
-        return 1
+        return 3
     fi
 
     # Parse INI, get download URL to .tar.gz
@@ -4198,17 +4185,71 @@ bpm::downloadPackageFromRegistry() {
     if [[ -z "$url" ]]; then
         log::error "No 'downloadUrl' property in package's information."
 
-        return 2
+        return 3
     fi
 
-    (
-        mkdir -p "$1/$2" || return 1
-        cd "$1/$2"
-        log::debug "Download, untar, gunzip: $url"
-        bpm::getUrl "$url" | tar xz
-    )
+    dest="$1/$2"
+    mkdir -p "$dest" || return 1
+    log::debug "Downloading: $url"
+    bpm::getUrl "$url" > "$dest/.bpm-archive"
+    bpm::expandArchive "$dest" ".bpm-archive"
+    rm "$dest/.bpm-archive" || return 1
+    bpm::fixPackageNesting "$dest"
+}
 
-    bpm::fixPackageNesting "$1/$2"
+
+
+# Decompresses a compressed file. Decompressed files are left in the same
+# folder as the archive.
+#
+# $1 - Folder location.
+# $2 - Archive file.
+#
+# This simply tries running all of the decompressors on the file, stopping
+# if one works and does not return an error. An alternative would be using
+# `file`, but that is not well supported across systems.
+#
+# Returns true (0) on success. Returns 1 if the archive type could not be
+# determined. Returns 2 if there's a problem during extraction, such as
+# being unable to write files.
+bpm::expandArchive() {
+    (
+        cd "$1"
+
+        if unzip -t "$2" &> /dev/null; then
+            log::debug "Detected zip file archive."
+            unzip "$2" &> /dev/null || return 2
+
+            return 0
+        fi
+
+        # This can work for .gz and .bz2 files.
+        if tar tf "$2" &> /dev/null; then
+            log::debug "Detected tar archive."
+            tar xf "$2" || return 2
+
+            return 0
+        fi
+
+        # Just in case the above does not work.
+        if tar tfz "$2" &> /dev/null; then
+            log::debug "Detected tar.gz archive."
+            tar xfz "$2" || return 2
+
+            return 0
+        fi
+
+        if tar tfj "$2" &> /dev/null; then
+            log::debug "Detected tar.bz2 archive."
+            tar xfj "$2" || return 2
+
+            return 0
+        fi
+
+        log::debug "Unable to determine archive format."
+
+        return 1
+    )
 }
 
 
@@ -4454,7 +4495,13 @@ bpm::installPackage() {
     fi
 
     echo "Installing $3"
-    bpm::downloadPackage "$1" "$3" "$4" || return 1
+
+    if ! bpm::downloadPackage "$1" "$3" "$4"; then
+        log::debug "Error downloading package. Removing any temporary directory."
+        rm -rf "${1:?}/$2"
+
+        return 1
+    fi
 
     # Parse the INI
     ini::prefix packagePrefix
