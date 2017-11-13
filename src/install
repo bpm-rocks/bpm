@@ -49,28 +49,24 @@ bpm::install() {
             binDir=~/.bpm/.bin
         fi
 
-        while [[ "$#" -gt 0 ]]; do
-            case "$1" in
-                -g|--global)
-                    log::debug "Installing to a global location"
-                    libDir=/usr/lib/bpm
-                    binDir=/usr/bin
-                    ;;
+        case "$1" in
+            -g|--global)
+                log::debug "Installing to a global location"
+                libDir=/usr/lib/bpm
+                binDir=/usr/bin
+                ;;
 
-                -*)
-                    log::warn "Unknown option: $1"
+            -*)
+                log::warn "Unknown option: $1"
 
-                    return 1
-                    ;;
+                return 1
+                ;;
 
-                *)
-                    log::debug "Install is using a package name: $1"
-                    bpm::addToInstallList "$1" "${2:-*}"
-                    ;;
-            esac
-
-            shift
-        done
+            *)
+                log::debug "Install is using a package name: $1"
+                bpm::addToInstallList "$1" "${2:-*}"
+                ;;
+        esac
     fi
 
     # Now install everything
