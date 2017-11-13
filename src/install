@@ -42,31 +42,28 @@ bpm::install() {
         binDir="$libDir/.bin"
     else
         if bpm::findParentIni iniFile; then
-            libDir="${iniFile%/*}/.bpm"
+            libDir="${iniFile%/*}/bpm-modules"
             binDir="$libDir/.bin"
         else
             libDir=~/.bpm
             binDir=~/.bpm/.bin
         fi
 
-        case "$1" in
-            -g|--global)
-                log::debug "Installing to a global location"
-                libDir=/usr/lib/bpm
-                binDir=/usr/bin
-                ;;
+        if [[ "$1" == "-g" || "$1" == "--global" ]]; then
+            log::debug "Installing to a global location"
+            libDir=/usr/lib/bpm
+            binDir=/usr/bin
+            shift
+        fi
 
-            -*)
-                log::warn "Unknown option: $1"
+        if [[ "$1" == -* ]]; then
+            log::warn "Unknown option: $1"
 
-                return 1
-                ;;
+            return 1
+        fi
 
-            *)
-                log::debug "Install is using a package name: $1"
-                bpm::addToInstallList "$1" "${2:-*}"
-                ;;
-        esac
+        log::debug "Install is using a package name: $1"
+        bpm::addToInstallList "$1" "${2:-*}"
     fi
 
     # Now install everything
