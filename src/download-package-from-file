@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# Downloads a package from a given archive file.
+#
+# $1 - Library directory for installation.
+# $2 - Package name.
+# $3 - Package version specifier.
+#
+# Returns true (0) on success. Returns 1 for filesystem level errors (can't
+# make a directory, can't copy a file). Returns 3 when the archive can not be
+# expanded.
+bpm::downloadPackageFromFile() {
+    local dest
+
+    dest="$1/$2"
+    log::debug "Copying file: $3"
+    mkdir -p "$dest" || return 1
+    cp "$3" "$dest/.bpm-archive" || return 1
+    bpm::expandArchive "$dest" ".bpm-archive" || return 3
+    rm "$dest/.bpm-archive" || return 1
+    bpm::fixPackageNesting "$dest"
+}

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+# Decompresses a compressed file. Decompressed files are left in the same
+# folder as the archive.
+#
+# $1 - Folder location.
+# $2 - Archive file.
+#
+# This simply tries running all of the decompressors on the file, stopping
+# if one works and does not return an error. An alternative would be using
+# `file`, but that is not well supported across systems.
+#
+# Returns true (0) on success. Returns 1 if the archive type could not be
+# determined. Returns 2 if there's a problem during extraction, such as
+# being unable to write files.
+bpm::expandArchive() {
+    (
+        cd "$1"
+
+        if unzip -t "$2" &> /dev/null; then
+            log::debug "Detected zip file archive."
+            unzip "$2" &> /dev/null || return 2
+
+            return 0
+        fi
+
+        # This can work for .gz and .bz2 files.
+        if tar tf "$2" &> /dev/null; then
+            log::debug "Detected tar archive."
+            tar xf "$2" || return 2
+
+            return 0
+        fi
+
+        # Just in case the above does not work.
+        if tar tfz "$2" &> /dev/null; then
+            log::debug "Detected tar.gz archive."
+            tar xfz "$2" || return 2
+
+            return 0
+        fi
+
+        if tar tfj "$2" &> /dev/null; then
+            log::debug "Detected tar.bz2 archive."
+            tar xfj "$2" || return 2
+
+            return 0
+        fi
+
+        log::debug "Unable to determine archive format."
+
+        return 1
+    )
+}
