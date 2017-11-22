@@ -127,7 +127,7 @@ Pretty easy, but this program doesn't have the string library available. Let's i
 That last command requires the use of an [INI file]. Here is the absolutely smallest one to install the `string` library.
 
     [dependencies]
-    0=string
+    string=*
 
 There's a lot more that can go in this file, and it's all [documented][INI file].
 
