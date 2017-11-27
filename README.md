@@ -11,15 +11,15 @@ A problem with Bash is that it doesn't have a package manager, unlike other lang
 Installation and Upgrade Instructions
 -------------------------------------
 
-To install for everyone on the system, run these commands. This folder should already be in your `$PATH`, so it should be searched automatically when running commands. Other users on the system won't need to do anything to run this program.
+To install for everyone on the system, run these commands. This folder should already be in your `$PATH`, so it should be searched automatically when running commands. Other users on the system won't need to do anything to run this program. It is preferred to use this method when possible.
 
-    curl -sSO https://git.io/bpm
+    curl -sSOL https://git.io/bpm
     chmod 755 bpm
     sudo mv bpm /usr/bin/
 
-The other option is to install it just for you into your own `bin/` folder. This assumes you've already created a `bin/` folder. You almost certainly need to add your `bin/` folder to `$PATH` so it is searched for commands. Other users on the system will also need to do the same if they want to run any commands that use `bpm` to find libraries.
+The other option is to install it just for you into your own `~/bin/` folder. This assumes you've already created a `~/bin/` folder. You almost certainly need to add your `~/bin/` folder to `$PATH` so it is searched for programs. Other users on the system will also need to do the same if they want to run any commands that use `bpm` to find libraries. Use this method when you do not have administrator access to a machine.
 
-    curl -sSO https://git.io/bpm
+    curl -sSOL https://git.io/bpm
     chmod 755 bpm
     mv bpm ~/bin/
 
