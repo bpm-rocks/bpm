@@ -87,7 +87,7 @@ Well, like many other programs out there, you can get a help message by running 
 This displays a simple help message.
 
 
-### `bpm install [OPTIONS] [PACKAGE [...]]
+### `bpm install [OPTIONS] [PACKAGE [...]]`
 
 Installs packages. When there are no packages nor options on the command-line, this searches a `bpm.ini` file and installs all of the `[dependencies]` and `[devDependencies]` that are listed.
 
@@ -148,14 +148,14 @@ Other Alternatives
 
 *Deps* is if the tool supports dependencies. **Locations** is where libraries can be installed (globally, in a user's home folder, or in a specific repository).
 
-| Software | Deps | Versions | Locations |
-|---|---|---|
-| basher | Yes | No | Global, User |
-| [bpkg] | Yes | Yes | Global, Repo |
-| `bpm` | Yes | No | Global, User, Repo |
-| [Jean] | No | No | Global |
-| [pkgtool] | Yes | Yes | Global |
-| [Tarp] | Yes | No | Global |
+    | Software  | Deps | Versions | Locations          |
+    |-----------|------|----------|--------------------|
+    | basher    | Yes  | No       | Global, User       |
+    | [bpkg]    | Yes  | Yes      | Global, Repo       |
+    | `bpm`     | Yes  | No       | Global, User, Repo |
+    | [Jean]    | No   | No       | Global             |
+    | [pkgtool] | Yes  | Yes      | Global             |
+    | [Tarp]    | Yes  | No       | Global             |
 
 * [basher] - No central repository required; uses GitHub repositories. Thoroughly tested code. Includes completions. Geared much more for binary programs instead of Bash libraries. Keeps the package repositories.
 * [bpkg] - Lightweight Bash package manager. Centralized repository for searching and installs inside of a project's "deps" folder. Confusingly, it uses `package.json` like Node.js projects. Meant more for executables.
