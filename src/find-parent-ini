@@ -8,7 +8,7 @@
 bpm::findParentIni() {
     local result
 
-    path::findParentContaining result -f "bpm.ini" || return 0
+    path::findParentContaining result -f "bpm.ini" || return 1
 
     local "${1-}" && assign::value "$1" "$result"
 }
