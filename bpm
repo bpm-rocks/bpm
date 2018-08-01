@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bash Package Manager (BPM)
-BPM_VERSION="1.0.0"
-BPM_BUILD_DATE="2017-11-13T18:11:27+00:00"
+BPM_VERSION="1.0.1"
+BPM_BUILD_DATE="2018-08-01T17:26:53+00:00"
 BPM_GLOBAL_PATH=/usr/lib/bpm-modules
 
 # Includes a library that was installed via `bpm install`.
@@ -165,16 +165,9 @@ is::array() {
 #
 # Returns true (0) if the name is a function, false (1) otherwise.
 is::function() {
-    local functionList functionName
-
-    functionList=$(declare -F)
-    functionList=( ${functionList//declare -f /} )
-
-    for functionName in "${functionList[@]}"; do
-        if [[ "$functionName" == "$1" ]]; then
-            return 0
-        fi
-    done
+    if [[ "$(type -t "$1" || :)" == "function" ]]; then
+        return 0
+    fi
 
     return 1
 }
@@ -233,10 +226,13 @@ bpm::include is
 #
 # Returns nothing.
 assign::array() {
-    unset -v "$1"
+    local IFS
 
     # Must set IFS - see the "Array Splitting" discussion.
-    eval "$(printf "IFS= %s=(\"\${@:2}\") IFS=%q" "$1" "$IFS")"
+    IFS=
+    unset -v "$1"
+
+    eval "$(printf "%s=(\"\${@:2}\")" "$1")"
 }
 
 
@@ -274,12 +270,50 @@ assign::byRef() {
     unset -v "$1"
 
     if is::array "$2"; then
-        # Must set IFS - see the "Array Splitting" discussion.
+        # This call must set IFS - see the "Array Splitting" discussion.
         eval "assign::array \"$1\" \${$2[@]+\"\${$2[@]}\"}"
     elif [[ -n "${!2+_}" ]]; then
         # If there is a value, copy it.
         printf -v "$1" '%s' "${!2}"
     fi
+}
+
+
+# Assign stdin to a value, preserving all newlines and everything that is
+# piped in.
+#
+# $1 - Variable name.
+#
+# Examples:
+#
+#   # This assigns *all* output to the variable
+#   assign::pipe output < <(ls)
+#
+#   # This does not; it trims the trailing newline.
+#   output=$(ls)
+#
+#   # Do not use it this way because the later functions are spawned in
+#   # subshells, thus can not really change the value how you want.
+#   echo "DOES NOT WORK THIS WAY" | assign::pipe badExample
+#
+#   # Works with heredocs!
+#   assign::pipe helpMessage <<'EOF'
+#   This is my help message.
+#   It can have "quotes", 'apostrophes' and `backticks`.
+#   EOF
+assign::pipe() {
+    assign::value "$1" "$(
+        cat
+
+        # Tricky thing part 1: append a period to the end so the subshell
+        # preserves any newlines at the end that cat found.
+        echo -n "."
+    )"
+
+    # Tricky thing part 2: remove that newline. This is all done without
+    # using a temporary variable so we don't need to worry about conflicting
+    # with parent scope variables.
+    assign::value "$1" "${!1%.}"
 }
 
 
@@ -310,6 +344,64 @@ bpm_include_string=$0
 
 . bpm
 bpm::include assign
+
+
+# Convert a string into a safely quoted string that's safe to pass around as an
+# argument.  It is unlikely that this will be necessary for most scripting
+# that's performed because one would need to use `eval` to parse this back to
+# the original value.
+#
+# $1   - Name of the environment variable that should get the result.
+# $2-@ - The value or values to escape.
+#
+# Examples
+#
+#   string::escape exampleResult one two three "four five"
+#   set | fgrep "exampleResult"
+#   # Output:
+#   # exampleResult='one two three four\ five'
+#
+# Returns nothing.
+string::escape() {
+    local escaped target
+
+    target="$1"
+    shift
+    printf -v escaped " %q" "$@" || return $?
+
+    local "$target" && assign::value "$target" "${escaped:1}"
+}
+
+
+# Hex decodes a string and writes it to stdout. Any non-hex characters are
+# ignored. Only decodes when there are two hex characters together, thus a
+# hex string of "308" is decoded as simply "0" (hex 0x30) and the last "8"
+# character is ignored.
+#
+# $1 - Target variable name for the hex encoded string.
+# $2 - The string to encode.
+#
+# Returns nothing.
+string::fromHex() {
+    local hex maxPos pos result
+
+    hex=$(
+        shopt -s extglob
+        echo "${2//[^a-fA-F0-9]}"
+    )
+    maxPos=$((${#hex} / 2))
+    result=""
+    pos=0
+
+    while [[ "$pos" -lt "$maxPos" ]]; do
+        result="$result\\x${hex:$pos * 2:2}"
+        pos=$((pos + 1))
+    done
+
+    printf -v result "$result"
+
+    local "${1-}" && assign::value "$1" "$result"
+}
 
 
 # Find the first index of a substring.  If not found, sets the index to -1.
@@ -3224,6 +3316,7 @@ bpm_include_array=$0
 
 . bpm
 bpm::include assign
+bpm::include strict
 
 
 # Determines if a value is in an array.
@@ -3262,6 +3355,59 @@ array::contains() {
     done
 
     return 1
+}
+
+
+# Run a list of values through a filter. When the filter returns an error,
+# remove that element from the list.
+#
+# $1    - Variable name where the final list will be placed.
+# $2    - Function or command to run. Receives one argument: a single value
+#         from the list.
+# $3-$@ - List of values in the array.
+#
+# Examples
+#
+#   removeAnimals() {
+#       case "$1" in
+#           dog|cat|cow|moose)
+#               # Return failure and the elements will be removed.
+#               return 1
+#               ;;
+#       esac
+#
+#       return 0
+#   }
+#
+#   words=(a dog and a cat chased a cow)
+#   array::filter filtered removeAnimals "${words[@]}"
+#
+#   # Prints "a and a chased a". The special hyphen allows you to print an
+#   # empty array in strict mode.
+#   echo "${filtered[@]-}"
+#
+# Returns nothing.
+array::filter() {
+    local filter result returnCode target
+
+    target=$1
+    shift
+    filter=$1
+    shift
+    result=()
+
+    while [[ $# -gt 0 ]]; do
+        strict::run returnCode "$filter" "$1"
+
+        if [[ "$returnCode" -eq 0 ]]; then
+            result[${#result[@]}]=$1
+        fi
+
+        shift
+    done
+
+    # shellcheck disable=SC2068
+    local "$target" && assign::array "$target" ${result[@]+"${result[@]}"}
 }
 
 
@@ -3493,7 +3639,7 @@ log::info() {
         log::toFile INFO "$content" || return $?
 
         if [[ -z "${LOG_QUIET-}" ]]; then
-            string::prefixLInes output "INFO: " "$content" || return $?
+            string::prefixLines output "INFO: " "$content" || return $?
 
             if [[ -n "${LOG_COLOR-}" ]]; then
                 output=$'\E[32m'"$output"$'\E[0m'
@@ -3666,6 +3812,26 @@ path::absoluteDir() {
 }
 
 
+# Resolves a file. If you are given a relative path, this turns it into
+# an absolute path.
+#
+# $1 - Destination variable name.
+# $2 - File path to resolve.
+# $3 - Path to resolve against (defaults to current directory).
+#
+# Returns true (0) when everything works. Returns error codes from
+# path::absoluteDir when there are problems.
+path::absoluteFile() {
+    local fileDir result
+
+    path::dirname fileDir "$2"
+    path::absoluteDir result "$fileDir" ${3+"$3"} || return $?
+    result=${result%/}
+
+    local "${1-}" && assign::value "$1" "$result/${2##*/}"
+}
+
+
 # Equivalent to calling `dirname` but does not make a subshell, so this is
 # roughly twice as fast.
 #
@@ -3816,8 +3982,10 @@ ini::get() {
 
         # shellcheck disable=SC2068
         local "$target" && assign::array "$target" ${value[@]+"${value[@]}"}
+    elif ! is::set "$keyName"; then
+        local "$target" && assign::value "$target" ""
     else
-        local "$target" && assign::value "$target" "${!keyName-}"
+        local "$target" && assign::byRef "$target" "$keyName"
     fi
 }
 
@@ -3863,21 +4031,35 @@ ini::keyName() {
 #   PREFIX_SECTIONENCODED=(array of unencoded key names)
 #   PREFIX_SECTIONENCODED_KEYENCODED=value
 #
-# You should not use these environment variables directly. Instead, use the
-# other utility functions to access the values.
+# Duplicted section names are merged together. Duplicated keys will have their
+# values changed into an array so all of the values will be captured. For
+# example, the INI on the left will be parsed into variables similar to the
+# right side. Keep in mind that section names and keys are case insensitive.
+#
+# [Section1]       PREFIX=(SECTION1 SECTION2
+# Key=value
+# kEy=value2       PREFIX_SECTION1=(KEY)
+#
+# [Section2]       PREFIX_SECTION2=(ANOTHER)
+# another=value
+#                  PREFIX_SECTION1_KEY=(value value2 value3)
+# [SECTION1]
+# KEY=value3       PREFIX_SECTION2_ANOTHER=value
+#
+# You should not use the generated environment variables directly. Instead, use
+# the other utility functions (eg. `ini::get`) to access the values.
 #
 #     $1: Prefix for variables.
 #     $2: INI file contents
 ini::parse() {
-    local encodedKey encodedSection key keys line oldIfs prefix section sections value
+    local encodedKey encodedSection key keys IFS line prefix previousValue section sections value
 
     prefix=$1
     sections=("")
     section=
     keys=()
-    ini::keyName encodedSection "$prefix" "$section"
-    oldIfs=$IFS
     IFS=$'\n'
+    ini::keyName encodedSection "$prefix" "$section"
 
     while read line; do
         string::trim line "$line"
@@ -3914,7 +4096,16 @@ ini::parse() {
             if [[ -n "$key" ]]; then
                 string::trim value "$value"
                 ini::keyName encodedKey "$prefix" "$section" "$key"
-                assign::value "$encodedKey" "$value"
+
+                if ! is::set "$encodedKey"; then
+                    assign::value "$encodedKey" "$value"
+                elif ! is::array "$encodedKey"; then
+                    assign::value previousValue "${!encodedKey}"
+                    assign::array "$encodedKey" "$previousValue" "$value"
+                else
+                    assign::byRef previousValue "$encodedKey"
+                    assign::array "$encodedKey" "${previousValue[@]}" "$value"
+                fi
 
                 # shellcheck disable=SC2068
                 if ! array::contains "$key" ${keys[@]+"${keys[@]}"}; then
@@ -3923,8 +4114,6 @@ ini::parse() {
             fi
         fi
     done <<< "$2"
-
-    IFS=$oldIfs
 
     # shellcheck disable=SC2068
     assign::array "$encodedSection" ${keys[@]+"${keys[@]}"}
@@ -4262,7 +4451,7 @@ bpm::expandArchive() {
 bpm::findParentIni() {
     local result
 
-    path::findParentContaining result -f "bpm.ini" || return 0
+    path::findParentContaining result -f "bpm.ini" || return 1
 
     local "${1-}" && assign::value "$1" "$result"
 }
