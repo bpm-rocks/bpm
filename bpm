@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bash Package Manager (BPM)
 BPM_VERSION="1.0.1"
-BPM_BUILD_DATE="2018-08-01T17:26:53+00:00"
+BPM_BUILD_DATE="2018-08-08T14:34:18+00:00"
 BPM_GLOBAL_PATH=/usr/lib/bpm-modules
 
 # Includes a library that was installed via `bpm install`.
@@ -271,7 +271,8 @@ assign::byRef() {
 
     if is::array "$2"; then
         # This call must set IFS - see the "Array Splitting" discussion.
-        eval "assign::array \"$1\" \${$2[@]+\"\${$2[@]}\"}"
+        # eval "assign::array \"$1\" \${$2[@]+\"\${$2[@]}\"}"
+        eval "$(printf "%s=(\"\${%s[@]}\")" "$1" "$2")"
     elif [[ -n "${!2+_}" ]]; then
         # If there is a value, copy it.
         printf -v "$1" '%s' "${!2}"
@@ -489,23 +490,33 @@ string::split() {
 
 # Hex encodes a string and writes it to stdout.
 #
+# Does not handle NULL characters. Hexadecimal is in capital letters.
+#
 # $1 - Target variable name for the hex encoded string.
 # $2 - The string to encode.
 #
 # Returns nothing.
 string::toHex() {
-    local hex pos result
+    local hex IFS LC_CTYPE pattern
 
-    result=
-    pos=0
+    IFS=$'\n' # Work around crazy array slicing bug before bash 4.0-rc1.
+    LC_CTYPE=C
+    hex=
 
-    while [[ "$pos" -lt "${#2}" ]]; do
-        printf -v hex "%02x" "'${2:$pos:1}"
-        result+=$hex
-        pos=$((pos + 1))
-    done
+    if [[ -n "$2" ]]; then
+        pattern=${2//?/(.)}
 
-    local "${1-}" && assign::value "$1" "$result"
+        # Match against a pattern that captures each character. No quotes here.
+        [[ "$2" =~ $pattern ]]
+
+        # Convert to arguments to printf, an escaped apostrophe + the char + a space.
+        printf -v hex "\\\\'%q " "${BASH_REMATCH[@]:1}"
+
+        # Now convert to hex. Do not add quotes to $hex.
+        eval 'printf -v hex "${2//?/%02X}" '"$hex"
+    fi
+
+    local "$1" && assign::value "$1" "$hex"
 }
 
 
@@ -3990,6 +4001,21 @@ ini::get() {
 }
 
 
+# Private: Sets up a new, blank INI structure in memory.
+#
+# Hardcode the empty section name as the first entry. Required to have a
+# single element and this also initializes the values.
+#
+# $1 - Prefix, required.
+#
+# Returns nothing.
+ini::initializePrefix() {
+    assign::array "$1" ""
+    ini::keyName emptySection "$1" ""
+    assign::array "$emptySection"
+}
+
+
 # Encode a prefix, section and key in order to generate a safe variable name
 # for Bash. All section names and key names are case insensitive.
 #
@@ -4031,7 +4057,7 @@ ini::keyName() {
 #   PREFIX_SECTIONENCODED=(array of unencoded key names)
 #   PREFIX_SECTIONENCODED_KEYENCODED=value
 #
-# Duplicted section names are merged together. Duplicated keys will have their
+# Duplicated section names are merged together. Duplicated keys will have their
 # values changed into an array so all of the values will be captured. For
 # example, the INI on the left will be parsed into variables similar to the
 # right side. Keep in mind that section names and keys are case insensitive.
@@ -4052,14 +4078,12 @@ ini::keyName() {
 #     $1: Prefix for variables.
 #     $2: INI file contents
 ini::parse() {
-    local encodedKey encodedSection key keys IFS line prefix previousValue section sections value
+    local IFS line prefix section
 
     prefix=$1
-    sections=("")
     section=
-    keys=()
     IFS=$'\n'
-    ini::keyName encodedSection "$prefix" "$section"
+    ini::initializePrefix "$prefix"
 
     while read line; do
         string::trim line "$line"
@@ -4071,55 +4095,17 @@ ini::parse() {
         if [[ "${line:0:1}" == '[' ]] && [[ "${line:${#line}-1}" == "]" ]]; then
             #: Remove brackets
             line=${line:1:${#line}-2}
-
-            # Save the previously loaded section
-            # shellcheck disable=SC2068
-            assign::array "$encodedSection" ${keys[@]+"${keys[@]}"}
-
             string::trim section "$line"
-            ini::keyName encodedSection "$prefix" "$section"
-
-            # shellcheck disable=SC2068
-            if ! array::contains "$section" ${sections[@]+"${sections[@]}"}; then
-                # Track the new section
-                sections[${#sections[@]}]=$section
-                keys=()
-            else
-                # Load the repeated section. Sorry for the eval.
-                # shellcheck disable=SC1087
-                eval "keys=( \${$encodedSection[@]+\"\${$encodedSection[@]}\"} )"
-            fi
         elif [[ -n "$line" ]]; then
             IFS="=" read key value <<< "$line"
             string::trim key "$key"
 
             if [[ -n "$key" ]]; then
                 string::trim value "$value"
-                ini::keyName encodedKey "$prefix" "$section" "$key"
-
-                if ! is::set "$encodedKey"; then
-                    assign::value "$encodedKey" "$value"
-                elif ! is::array "$encodedKey"; then
-                    assign::value previousValue "${!encodedKey}"
-                    assign::array "$encodedKey" "$previousValue" "$value"
-                else
-                    assign::byRef previousValue "$encodedKey"
-                    assign::array "$encodedKey" "${previousValue[@]}" "$value"
-                fi
-
-                # shellcheck disable=SC2068
-                if ! array::contains "$key" ${keys[@]+"${keys[@]}"}; then
-                    keys[${#keys[@]}]=$key
-                fi
+                ini::set "$prefix" "$section" "$key" "$value"
             fi
         fi
     done <<< "$2"
-
-    # shellcheck disable=SC2068
-    assign::array "$encodedSection" ${keys[@]+"${keys[@]}"}
-
-    # shellcheck disable=SC2068
-    assign::array "$prefix" ${sections[@]+"${sections[@]}"}
 }
 
 
@@ -4140,6 +4126,177 @@ ini::prefix() {
     done
 
     local "$1" && assign::value "$1" "$prefix"
+}
+
+
+# Removes a key from a section or a section from a loaded INI. Frees up
+# memory by unsetting environment variables. If no section is specified,
+# removes all of the INI from memory.
+#
+# $1 - Prefix for environment variables, required.
+# $2 - Section name, optional.
+# $3 - Key name, optional.
+#
+# Returns nothing.
+ini::remove() {
+    local index key keys encoded IFS upper
+
+    IFS=$'\n' # Needed for array slicing before Bash 4.0-rc1
+
+    if [[ $# -gt 2 ]]; then
+        # Remove key
+        ini::keyName encoded "$1" "$2" "$3"
+        unset "$encoded"
+
+        # Remove key from the section
+        ini::keyName encoded "$1" "$2"
+        assign::byRef keys "$encoded"
+        string::toUpper upper "$3"
+
+        if array::indexOf index "$upper" ${keys[@]+"${keys[@]}"}; then
+            keys=("${keys[@]:0:index}" "${keys[@]:index+1}")
+        fi
+
+        assign::array "$encoded" ${keys[@]+"${keys[@]}"}
+    elif [[ $# -gt 1 ]]; then
+        # Remove keys from section
+        ini::keyName encoded "$1" "$2"
+        assign::byRef keys "$encoded"
+
+        if [[ "${#keys[@]}" -gt 0 ]]; then
+            for key in "${keys[@]}"; do
+                ini::remove "$1" "$2" "$key"
+            done
+        fi
+
+        # Remove the section
+        unset "$encoded"
+
+        # Remove the section from the list of sections
+        ini::keyName encoded "$1"
+        assign::byRef keys "$encoded"
+        string::toUpper upper "$2"
+
+        if array::indexOf index "$upper" ${keys[@]+"${keys[@]}"}; then
+            keys=("${keys[@]:0:index}" "${keys[@]:index+1}")
+        fi
+
+        assign::array "$encoded" ${keys[@]+"${keys[@]}"}
+    else
+        # Remove sections
+        ini::keyName encoded "$1"
+        assign::byRef keys "$1"
+
+        for key in "${keys[@]}"; do
+            ini::remove "$1" "$key"
+        done
+
+        # Remove the list
+        unset "$1"
+    fi
+}
+
+
+# Assigns a value to a property
+#
+# This will set the value if it isn't already assigned. If it is
+# assigned, it will add the value to the array in memory.
+#
+# $1 - Prefix for environment variables, required.
+# $2 - Section name, required.
+# $3 - Key, required.
+# $4 - Value, required.
+#
+# Returns nothing.
+ini::set() {
+    local keyEncoded keys keyUpper previousValue sectionEncoded sectionUpper sections
+
+    assign::byRef sections "$1"
+
+    if ! is::array sections; then
+        ini::initializePrefix "$1"
+        sections=("")
+    fi
+
+    string::toUpper sectionUpper "$2"
+    ini::keyName sectionEncoded "$1" "$2"
+    string::toUpper keyUpper "$3"
+    ini::keyName keyEncoded "$1" "$2" "$3"
+
+    if array::contains "$sectionUpper" ${sections[@]+"${sections[@]}"}; then
+        assign::byRef keys "$sectionEncoded"
+    else
+        sections[${#sections[@]}]=$sectionUpper
+        assign::array "$1" "${sections[@]}"
+        keys=()
+    fi
+
+    if array::contains "$keyUpper" ${keys[@]+"${keys[@]}"}; then
+        if ! is::array "$keyEncoded"; then
+            assign::value previousValue "${!keyEncoded}"
+            previousValue=( "$previousValue" )
+        else
+            assign::byRef previousValue "$keyEncoded"
+        fi
+
+        assign::array "$keyEncoded" "${previousValue[@]}" "$4"
+    else
+        keys[${#keys[@]}]=$keyUpper
+        assign::array "$sectionEncoded" "${keys[@]}"
+        assign::value "$keyEncoded" "$4"
+    fi
+}
+
+# Transfers the in-memory contents of the INI file back into a string.
+#
+# You will lose all of your comments that were in the INI file. The order of
+# the sections may not be preserved. The order of the keys may not be
+# preserved. Any values that were overwritten in the original INI file
+# shall be eliminated.
+#
+# Think of it as a cleansing to see what's really parsed instead of losing
+# data.
+#
+# $1 - Destination variable name for the string.
+# $2 - INI prefix
+#
+# Returns nothing.
+ini::toString() {
+    local key keys nl prefix result section sections value values
+
+    prefix=$2
+    nl=$'\n'
+    ini::get sections "$prefix"
+    result=
+    for section in "${sections[@]}"; do
+        keys=()
+        ini::get keys "$prefix" "$section"
+
+        if [[ "${#keys[@]}" -gt 0 ]]; then
+            # Skipping the section name for root entries always works
+            # because it's always hardcoded as the first section name.
+            if [[ -n "$section" ]]; then
+                result="$result[$section]$nl"
+            fi
+
+            for key in "${keys[@]}"; do
+                values=()
+                ini::get values "$prefix" "$section" "$key"
+
+                if is::array values; then
+                    for value in "${values[@]}"; do
+                        result="$result$key=$value$nl"
+                    done
+                else
+                    result="$result$key=$values$nl"
+                fi
+            done
+
+            result="$result$nl"
+        fi
+    done
+
+    local "$1" && assign::value "$1" "$result"
 }
 # Sets the PATH environment variable to add the following values, in this
 # order:
