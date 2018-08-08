@@ -40,12 +40,13 @@ EOF
 # | is      | Yes     |                           |
 # | assign  | Yes     | is                        |
 # | string  | No      | assign                    |
-# | array   | No      | assign                    |
+# | strict  | No      | assign                    |
+# | array   | No      | assign, strict            |
 # | log     | Yes     | array, string             |
 # | path    | Yes     | assign, log               |
 # | ini     | Yes     | array, assign, is, string |
 
-for lib in is assign string array log path ini; do
+for lib in is assign string strict array log path ini; do
     echo "bpm_include_$lib=\$0"
     cat bpm-modules/$lib/lib$lib
 done

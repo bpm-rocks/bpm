@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bash Package Manager (BPM)
-BPM_VERSION="1.1.1"
-BPM_BUILD_DATE="2018-08-08T14:38:26+00:00"
+BPM_VERSION="1.1.2"
+BPM_BUILD_DATE="2018-08-08T14:41:20+00:00"
 BPM_GLOBAL_PATH=/usr/lib/bpm-modules
 
 # Includes a library that was installed via `bpm install`.
@@ -3322,6 +3322,239 @@ string::trimStrings() {
 }
 
 
+bpm_include_strict=$0
+#!/usr/bin/env bash
+
+. bpm
+bpm::include assign
+
+# Check if errors are ignored. Be careful, calling this function inside of
+# a conditional will completely change the answer.
+#
+# $1 - Result should be placed in this variable.
+#
+# The value that's stored in the variable named by `$1` will be one of these
+# values:
+#
+# * `true` - Errors are honored.
+# * `false` - Errors are not honored.
+#
+# By "honored", it means that the program should terminate when `set -eE` is
+# enabled.
+#
+# Examples
+#
+#   # Using ||, &&, or any other conditional changes the context.
+#   strict::checkErrors || echo "Errors in conditionals are not honored."
+#
+# Returns nothing.
+strict::checkErrorsHonored() {
+    local result
+
+    result="$(
+        # Subshells are used to help avoid cleanup.
+        set +eE
+        trap - ERR
+
+        checkIfIgnored() {
+            (
+                set -eE
+                false
+                true
+            )
+        }
+
+        checkIfIgnored
+
+        if [[ $? -eq 0 ]]; then
+            echo false
+        else
+            echo true
+        fi
+    )"
+
+    local "$1" && assign::value "$1" "$result"
+}
+
+
+# Turns off strict mode.
+#
+# Examples
+#
+#   # Turn on strict mode
+#   strict::mode
+#
+#   # Turn off strict mode
+#   strict::disable
+#
+# Returns nothing.
+strict::disable() {
+    set +eEu +o pipefail
+    shopt -u extdebug
+    trap - ERR
+
+    #: This is the default IFS
+    IFS=$' \t\n'
+}
+
+
+# The ERR trap calls this function to report on the error location
+# right before dying.  See `strict::mode` for further details.
+#
+# $1 - Status from failed command.
+#
+# Example
+#
+#   # This sets the error trap.
+#   strict::mode
+#
+#   # Cause an error
+#   ls some-file-that-is-not-there
+#   # This calls the ERR trap, passing 2 as the status code.
+#
+# Returns nothing.
+strict::failure() (
+    set +x
+    local argsList argsLeft i nextArg
+
+    echo "Error detected - status code $1" >&2
+    echo "Command:  $BASH_COMMAND" >&2
+    echo "Location:  ${BASH_SOURCE[1]:-unknown}, line ${BASH_LINENO[0]:-unknown}" >&2
+
+    if [[ ${#PIPESTATUS[@]} -gt 1 ]]; then
+        echo "Pipe status: " "${PIPESTATUS[@]}" >&2
+    fi
+
+    i=$#
+    nextArg=$#
+
+    if [[ $i -lt ${#BASH_LINENO[@]} ]]; then
+        echo "Stack Trace:" >&2
+    else
+        echo "Stack trace is unavailable" >&2
+    fi
+
+    while [[ $i -lt ${#BASH_LINENO[@]} ]]; do
+        argsList=()
+
+        if [[ ${#BASH_ARGC[@]} -gt $i && ${#BASH_ARGV[@]} -ge $(( nextArg + BASH_ARGC[i] )) ]]; then
+            for (( argsLeft = BASH_ARGC[i]; argsLeft; --argsLeft )); do
+                # Note: this reverses the order on purpose
+                argsList[$argsLeft]=${BASH_ARGV[nextArg]}
+                (( nextArg ++ ))
+            done
+
+            if [[ ${#argsList[@]} -gt 0 ]]; then
+                printf -v argsList " %q" "${argsList[@]}"
+            else
+                argsList=""
+            fi
+
+            if [[ ${#argsList} -gt 255 ]]; then
+                argsList=${argsList:0:250}...
+            fi
+        else
+            argsList=""
+        fi
+
+        echo "    [$i] ${FUNCNAME[i]:+${FUNCNAME[i]}(): }${BASH_SOURCE[i]}, line ${BASH_LINENO[i - 1]} -> ${FUNCNAME[i]:-${BASH_SOURCE[i]##*/}}$argsList" >&2
+        (( i ++ ))
+    done
+)
+
+
+# Enables "strict mode" for Bash, based off [unofficial bash strict mode].
+# Errors will kill the program.  Accessing undefined variables will cause
+# errors (and exit the program).  Commands in pipelines that return a non-zero
+# status code will also cause errors and kill the program.  An ERR trap is also
+# enabled that will produce a stack trace when errors happen.
+#
+# Not all errors are caught. There's an error context in Bash that ignores
+# errors, so be careful when you intend to rely on this behavior. It is only
+# here as a safety net to catch you in case of problems, not a babysitter
+# to prevent you from starting the house on fire.
+#
+# This is intended to be used at the beginning of your shell scripts in order
+# to ensure correctness in your programming.
+#
+# Examples
+#
+#   #!/usr/bin/env bash
+#   . bpm
+#   bpm::include strict
+#   strict::mode
+#
+# [unofficial bash strict mode]: http://redsymbol.net/articles/unofficial-bash-strict-mode/
+#
+# Returns nothing.
+strict::mode() {
+    set -eEu -o pipefail
+    shopt -s extdebug
+    IFS=$'\t\n'
+    trap 'strict::failure $?' ERR
+}
+
+
+# Runs a command and captures its return code, even when strict mode is
+# enabled.  The variable name you specify is set to the return code of the
+# command.
+#
+# $1   - Name of variable that should get the return value / status code.
+# $2-@ - Command and arguments to run.
+#
+# This is intended to be used along with `strict::mode`.  It helps counter
+# the newer Bash behavior where the error exit flag is suppressed in
+# specific contexts.
+#
+# Execution of a command happens in a subshell.  If you are running a function
+# with `strict::run`, please keep in mind that it can not export values
+# to the parent context for use by the caller.
+#
+# Example:
+#
+#   #!/usr/bin/env bash
+#   . bpm
+#   bpm::include strict
+#   strict::mode
+#
+#   strict::run result grep "some-string" /etc/some-file.cfg > /dev/null 2>&1
+#
+#   if [[ "$result" -eq 0 ]]; then
+#       echo "some-string was found"
+#   else
+#       echo "some-string was not found"
+#   fi
+#
+# Returns nothing.
+strict::run() {
+    local dest restoreErrors result
+
+    dest=${1-}
+    shift
+
+    #: Gathering current settings and traps for ERR
+    #: so we can restore them later.
+    restoreErrors="set \"-$-\";$(trap -p ERR)"
+
+    # Disabling errors only for the area around this subshell.  For once,
+    # we don't want it to exit if the subshell fails and we don't
+    # want it logging a stack trace just for this line.  We do,
+    # however, want strict mode enabled inside the subshell.
+    set +eE
+    trap - ERR
+    (
+        # Can't seem to find a safe way to pass the tests without using & and
+        # "wait". Open to ideas.
+        eval "$restoreErrors"
+        "$@" &
+        wait "$!" && return $?
+    )
+
+    result=$?
+    eval "$restoreErrors"
+
+    local "$dest" && assign::value "$dest" "$result"
+}
 bpm_include_array=$0
 #!/usr/bin/env bash
 
