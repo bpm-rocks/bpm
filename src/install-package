@@ -35,18 +35,22 @@
 # This returns true (0) on success. Returns 1 if there is any issue downloading
 # the package.
 bpm::installPackage() {
-    local dependencies package packagePrefix version
+    local dependency dependencies package packagePrefix version
+
+    # All packages are in lowercase. INI reading might return them in any
+    # capitalization.
+    string::toLower package "$3"
 
     # See if it is already installed.
-    if [[ -d "$1/$3" ]]; then
-        log::debug "Package already installed: $3"
+    if [[ -d "$1/$package" ]]; then
+        log::debug "Package already installed: $package"
 
         return 0
     fi
 
-    echo "Installing $3"
+    echo "Installing $package"
 
-    if ! bpm::downloadPackage "$1" "$3" "$4"; then
+    if ! bpm::downloadPackage "$1" "$package" "$4"; then
         log::error "Error downloading package."
         rm -rf "${1:?}/$2"
 
@@ -56,24 +60,24 @@ bpm::installPackage() {
     # Parse the INI
     ini::prefix packagePrefix
 
-    if [[ -f "$1/$3/bpm.ini" ]]; then
+    if [[ -f "$1/$package/bpm.ini" ]]; then
         log::debug "Loading package INI."
-        ini::parse "$packagePrefix" "$(cat "$1/$3/bpm.ini")"
+        ini::parse "$packagePrefix" "$(cat "$1/$package/bpm.ini")"
     else
         log::debug "No package INI file. Faking an empty config."
     fi
 
     # Install
-    bpm::linkIncludeFile "$1" "$3" "$packagePrefix"
-    bpm::linkPrograms "$1" "$2" "$3" "$packagePrefix"
+    bpm::linkIncludeFile "$1" "$package" "$packagePrefix"
+    bpm::linkPrograms "$1" "$2" "$package" "$packagePrefix"
 
     # Install any dependencies
     ini::get dependencies "$packagePrefix" dependencies
 
     if [[ "${#dependencies[@]}" ]]; then
-        for package in "${dependencies[@]}"; do
-            ini::get version "$packagePrefix" dependencies "$package"
-            bpm::installPackage "$1" "$2" "$package" "$version"
+        for dependency in "${dependencies[@]}"; do
+            ini::get version "$packagePrefix" dependencies "$dependency"
+            bpm::installPackage "$1" "$2" "$dependency" "$version"
         done
     fi
 }
