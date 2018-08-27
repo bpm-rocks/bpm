@@ -48,7 +48,15 @@ bpm::linkPrograms() {
         cat > "$2/$src" <<EOF
 #!/usr/bin/env bash
 # Generated command file for bpm
-"$libFolderResolved/$dest" \${@+"\$@"}
+bpm::isSourced() {
+    [[ "\${FUNCNAME[1]-}" == "source" ]]
+}
+
+if bpm::isSourced; then
+    . "$libFolderResolved/$dest" ${@+"$@"}
+else
+    "$libFolderResolved/$dest" ${@+"$@"}
+fi
 EOF
         chmod 755 "$2/$src"
     done
