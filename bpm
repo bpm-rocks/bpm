@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bash Package Manager (BPM)
-BPM_VERSION="1.1.6"
-BPM_BUILD_DATE="2018-08-27T14:07:10+00:00"
+BPM_VERSION="1.1.7"
+BPM_BUILD_DATE="2018-08-27T17:50:04+00:00"
 BPM_GLOBAL_PATH=/usr/lib/bpm-modules
 
 # Includes a library that was installed via `bpm install`.
@@ -5198,9 +5198,9 @@ bpm::isSourced() {
 }
 
 if bpm::isSourced; then
-    . "$libFolderResolved/$dest" ${@+"$@"}
+    . "$libFolderResolved/$dest" \${@+"\$@"}
 else
-    "$libFolderResolved/$dest" ${@+"$@"}
+    "$libFolderResolved/$dest" \${@+"\$@"}
 fi
 EOF
         chmod 755 "$2/$src"

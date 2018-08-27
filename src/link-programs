@@ -53,9 +53,9 @@ bpm::isSourced() {
 }
 
 if bpm::isSourced; then
-    . "$libFolderResolved/$dest" ${@+"$@"}
+    . "$libFolderResolved/$dest" \${@+"\$@"}
 else
-    "$libFolderResolved/$dest" ${@+"$@"}
+    "$libFolderResolved/$dest" \${@+"\$@"}
 fi
 EOF
         chmod 755 "$2/$src"
