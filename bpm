@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bash Package Manager (BPM)
-BPM_VERSION="1.1.4"
-BPM_BUILD_DATE="2018-08-08T16:39:32+00:00"
+BPM_VERSION="1.1.6"
+BPM_BUILD_DATE="2018-08-27T14:07:10+00:00"
 BPM_GLOBAL_PATH=/usr/lib/bpm-modules
 
 # Includes a library that was installed via `bpm install`.
@@ -5193,7 +5193,15 @@ bpm::linkPrograms() {
         cat > "$2/$src" <<EOF
 #!/usr/bin/env bash
 # Generated command file for bpm
-"$libFolderResolved/$dest" \${@+"\$@"}
+bpm::isSourced() {
+    [[ "\${FUNCNAME[1]-}" == "source" ]]
+}
+
+if bpm::isSourced; then
+    . "$libFolderResolved/$dest" ${@+"$@"}
+else
+    "$libFolderResolved/$dest" ${@+"$@"}
+fi
 EOF
         chmod 755 "$2/$src"
     done
