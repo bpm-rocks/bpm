@@ -156,13 +156,14 @@ Other Alternatives
 | [Jean]    | No   | No       | Global             |
 | [pkgtool] | Yes  | Yes      | Global             |
 | [Tarp]    | Yes  | No       | Global             |
+| [Themis]  | Yes  | Yes      | Global, User, Repo |
 
 * [basher] - No central repository required; uses GitHub repositories. Thoroughly tested code. Includes completions. Geared much more for binary programs instead of Bash libraries. Keeps the package repositories.
 * [bpkg] - Lightweight Bash package manager. Centralized repository for searching and installs inside of a project's "deps" folder. Confusingly, it uses `package.json` like Node.js projects. Meant more for executables.
 * [Jean] - The missing shell package manager for Linux. List of packages is stored locally (`packages.txt`) and currently lists 4 packages. Looks like it is missing anything to tie the scripts together, like what the "main" property does for an npm-style `package.json`. Really dislikes spaces in folder names.
 * [pkgtool] - Developed by Slackware. Installs tarballs to the system.
 * [Tarp Package Manager][Tarp] - Installs tarballs to the system. Deprecated code and developer is off the net.
-
+* [Themis] - a cross platform package manager for GNU/Linux distributions written in bash. Users can be create and published bash libraries packages on their repositories.
 
 [basher]: https://github.com/basherpm/basher
 [bpkg]: http://www.bpkg.sh/
@@ -170,3 +171,4 @@ Other Alternatives
 [Jean]: https://github.com/ziyaddin/jean
 [pkgtool]: http://www.slackbook.org/html/package-management.html
 [Tarp]: https://code.google.com/archive/p/tarp-package-manager/
+[Themis]: https://github.com/ByCh4n-Group/themis
